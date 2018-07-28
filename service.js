@@ -105,7 +105,7 @@ class HomeService {
     }
 }
 
-class HomeExtension {
+var HomeExtension = class {
     constructor(config_file) {
         this._config_file = config_file;
     }
