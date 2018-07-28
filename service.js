@@ -37,18 +37,12 @@ const ActiveConnectionProxy = Gio.DBusProxy.makeProxyWrapper(ActiveConnectionInt
 const HomeProxy = Gio.DBusProxy.makeProxyWrapper(HomeInterface);
 
 class HomeService {
-    constructor() {
-        this._ssids = []
+    constructor(ssids) {
+        this._ssids = ssids;
+        this.connect();
     }
 
-    enable() {
-        let [ok, contents] = GLib.file_get_contents('/home/skade/.home_wifis.json');
-
-        if (ok) {
-            let settings = JSON.parse(contents);
-            this._ssids = settings["ssids"];
-        }
-
+    connect() {
         this._netProxy = new NetworkManagerProxy(
             Gio.DBus.system,
             "org.freedesktop.NetworkManager",
@@ -70,9 +64,9 @@ class HomeService {
 
         this._bus = Gio.DBusExportedObject.wrapJSObject(HomeInterface, this);
         this._bus.export(Gio.DBus.session, '/org/florian/Home');
-    }   
+    }
 
-    disable() {
+    shutdown() {
         Gio.DBus.session.unown_name('org.florian.Home',
             Gio.BusNameOwnerFlags.NONE,
             null,
@@ -108,5 +102,40 @@ class HomeService {
         }
     
         return null;
+    }
+}
+
+class HomeExtension {
+    constructor(config_file) {
+        this._config_file = config_file;
+    }
+
+    readConfig(file) {
+        let [ok, contents] = GLib.file_get_contents('/home/skade/.home_wifis.json');
+
+        if (ok) {
+            let settings = JSON.parse(contents);
+            return settings;
+        }
+
+        throw "Could not read settings file, aborting.";
+    }
+
+    startService(settings) {
+        this._service = new HomeService(settings["ssids"]);
+    }
+
+    stopService() {
+        this._service.shutdown();
+        this._service = null;
+    }
+
+    enable() {
+        let settings = this.readConfig(this._config_file);
+        this.startService(settings);
+    }
+
+    disable() {
+        this.stopService();
     }
 }
